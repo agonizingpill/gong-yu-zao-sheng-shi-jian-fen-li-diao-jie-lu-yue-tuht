@@ -1,0 +1,2 @@
+export async function api(path,options={}){const token=sessionStorage.getItem('quiet-token');const res=await fetch('/api'+path,{...options,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(options.headers||{})}});const data=await res.json();if(!res.ok){const detail=typeof data.detail==='string'?data.detail:JSON.stringify(data.detail||data);throw new Error(detail)}return data}
+export const post=(path,data)=>api(path,{method:'POST',body:JSON.stringify(data||{})});
