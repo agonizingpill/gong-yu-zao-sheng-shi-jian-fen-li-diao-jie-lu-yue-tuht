@@ -1,6 +1,6 @@
 from datetime import timedelta
 from sqlalchemy import select
-from .models import Remedy,Recheck,NoiseEvent,Breach,Closure
+from .models import Remedy,Recheck,NoiseEvent,Breach,Closure,SuspensionEvent
 from .common import require,lock_agreement,get,record,dump,now,within_window
 
 def completed(db,a):
@@ -12,6 +12,7 @@ def recheck(db,user,id,data):
     case,a=lock_agreement(db,id);require(a.state in ('active','breached'),'当前不可登记复验')
     tasks=completed(db,a);e=get(db,NoiseEvent,data.event_id)
     require(e.complaint_id==case.id,'复验事件必须属于本卷')
+    require(not db.scalar(select(SuspensionEvent).where(SuspensionEvent.event_id==e.id)),'该采样处于停用时段，已拦截，不能充当复验')
     require(e.measured_at>max(t.completed_at for t in tasks),'复验必须在最后一项整改完成之后')
     require(within_window(e.measured_at,a),'复验必须覆盖协议静音时段')
     require(not db.scalar(select(Recheck).where(Recheck.event_id==e.id)),'该事件已用作复验')

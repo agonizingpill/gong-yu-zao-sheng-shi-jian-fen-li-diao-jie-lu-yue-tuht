@@ -5,6 +5,7 @@ from sqlalchemy import select
 from .database import Session
 from .models import Separation,NoiseEvent
 from .common import lock_case
+from . import suspension_service as suspension
 from .separation import calculate
 q=redis.Redis.from_url(os.getenv('REDIS_URL','redis://redis:6379/0'),decode_responses=True)
 while True:
@@ -22,7 +23,10 @@ while True:
             if job.state!='queued':continue
             jobid=job.id
             if not case.consent:raise ValueError('授权已撤回，任务取消；恢复授权后可重新提交')
-            job.state='running';events=[{'id':e.id,'energies':e.energies} for e in db.scalars(select(NoiseEvent).where(NoiseEvent.id.in_(job.event_ids)).order_by(NoiseEvent.id))]
+            job.state='running'
+            # 双重保险：排队后若有采样被停用隔离，计算时再次剔除，不把停用时段数据送进NMF。
+            blocked=suspension.quarantined_ids(db,job.complaint_id)
+            events=[{'id':e.id,'energies':e.energies} for e in db.scalars(select(NoiseEvent).where(NoiseEvent.id.in_(job.event_ids)).order_by(NoiseEvent.id)) if e.id not in blocked]
             db.commit()
         result=calculate(events)
         with Session() as db:

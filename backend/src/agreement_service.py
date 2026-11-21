@@ -1,11 +1,14 @@
 from sqlalchemy import select
 from .models import Attribution,Agreement,Signature,Remedy
 from .common import require,lock_case,lock_agreement,get,record,dump,now
+from . import suspension_service as suspension
 
 def create_agreement(db,user,caseid,data):
     case=lock_case(db,caseid);require(case.status=='mediation','须先完成人工归因，再起草调解协议')
     attr=get(db,Attribution,data.attribution_id)
     require(attr.complaint_id==caseid and attr.source!='undetermined','归因须属于本卷且来源已核实')
+    # 停用与归因同时提交时，调解暂停引用受影响归因。
+    suspension.mediation_blocked_attribution(db,caseid,data.attribution_id)
     require(not db.scalar(select(Agreement).where(Agreement.complaint_id==caseid,Agreement.state.notin_(['cancelled','fulfilled']))),'本卷已有在途协议')
     row=Agreement(complaint_id=caseid,**data.model_dump());db.add(row);db.flush();record(db,user,'agreement.draft',row.id,caseid);db.commit();return dump(row)
 def sign(db,user,id,data):

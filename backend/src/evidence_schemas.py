@@ -22,3 +22,7 @@ class AttributionInput(BaseModel):
     separation_id:int=Field(gt=0)
     source:Literal['equipment','impact','speech','undetermined']
     evidence:str=Field(min_length=10,max_length=500)
+class RequalificationInput(BaseModel):
+    suspension_id:int=Field(gt=0)
+    event_ids:list[int]=Field(min_length=3,max_length=50)
+    note:str=Field(min_length=6,max_length=300)
